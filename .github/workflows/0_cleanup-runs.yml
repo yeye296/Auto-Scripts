@@ -1,0 +1,68 @@
+name: 0 Cleanup Workflow Runs
+
+on:
+  # 每4小时一次
+  schedule:
+    - cron: '0 0 */10 * *'
+  
+  # 手动触发
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Delete old workflow runs
+      id: cleanup
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 0
+        delete_workflow_by_state_pattern: 'ALL'
+        delete_run_by_conclusion_pattern: 'ALL'
+    
+    - name: Generate README.md (success)
+      if: success()
+      run: |
+        cat > README.md << EOF
+        # Workflow Run Status
+        
+        | Item | Value |
+        |------|-------|
+        | Run Time | $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S') |
+        | Trigger | ${{ github.event_name }} |
+        | Status | ✅ Success |
+        EOF
+    
+    - name: Generate README.md (failure)
+      if: failure()
+      run: |
+        cat > README.md << EOF
+        # Workflow Run Status
+        
+        | Item | Value |
+        |------|-------|
+        | Run Time | $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S') |
+        | Trigger | ${{ github.event_name }} |
+        | Status | ❌ Failed |
+        EOF
+    
+    - name: Commit and push README.md
+      if: always()
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add README.md
+        git diff --staged --quiet || git commit -m "📝 Update README.md - Run #${{ github.run_number }}"
+        git push
