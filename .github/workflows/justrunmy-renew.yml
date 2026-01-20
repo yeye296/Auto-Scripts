@@ -1,0 +1,89 @@
+name: JustRunMy Auto Renew
+
+on:
+  schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    # 👇 在这里定义全局变量，后续修改目录名只需改这一个地方
+    env:
+      WORK_DIR: justrunmy  # 你的目标子项目目录名
+      
+      # 密钥环境变量（保持不变，供后续步骤调用）
+      USERNAME: ${{ secrets.JUSTRUNMY_MAIL }}
+      PASSWORD: ${{ secrets.JUSTRUNMY_PASS }}
+      PANEL_URL: ${{ secrets.JUSTRUNMY_PANEL_URL }}
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        # 👇 使用变量拼接路径
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: pip install -r requirements.txt -q > /dev/null 2>&1
+
+      - name: Run renew script
+        # 👇 使用变量拼接路径
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: python app.py
+
+      - name: Commit and Push Cookie Update
+        if: success()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # 👇 在 Shell 脚本中使用环境变量 $WORK_DIR
+          COOKIE_TXT="${WORK_DIR}/cookies.txt"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          
+          HAS_CHANGES=false
+          
+          # 检查文件是否存在且有变化
+          if [[ -n $(git status -s "$COOKIE_TXT" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_TXT 更新"
+            git add "$COOKIE_TXT"
+            HAS_CHANGES=true
+          fi
+          
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            HAS_CHANGES=true
+          fi
+          
+          if [ "$HAS_CHANGES" = true ]; then
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
