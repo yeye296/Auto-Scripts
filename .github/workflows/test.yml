@@ -1,0 +1,61 @@
+name: test
+
+on:
+  workflow_dispatch:      # 允许手动点击按钮触发
+
+
+jobs:
+  run-renew:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Browser Versions & UA
+        run: |
+          echo "========================================="
+          echo "🟣 Google Chrome Info (Stable)"
+          echo "========================================="
+          if which google-chrome > /dev/null; then
+            echo "Path: $(which google-chrome)"
+            google-chrome --version
+            echo "Actual User-Agent:"
+            google-chrome --headless --no-sandbox --disable-gpu --dump-dom https://ifconfig.me/ua
+          else
+            echo "❌ Google Chrome not found."
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "🔵 Chromium Info (Open Source)"
+          echo "========================================="
+          if which chromium-browser > /dev/null; then
+            echo "Path: $(which chromium-browser)"
+            chromium-browser --version
+            echo "Actual User-Agent:"
+            chromium-browser --headless --no-sandbox --disable-gpu --dump-dom https://ifconfig.me/ua
+          else
+            echo "⚠️ Chromium not found (GitHub Runners usually default to Google Chrome)"
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "🟢 Microsoft Edge Info"
+          echo "========================================="
+          if which microsoft-edge > /dev/null; then
+            echo "Path: $(which microsoft-edge)"
+            microsoft-edge --version
+            echo "Actual User-Agent:"
+            microsoft-edge --headless --no-sandbox --disable-gpu --dump-dom https://ifconfig.me/ua
+          else
+            echo "❌ Microsoft Edge not found."
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "🦊 Firefox Info"
+          echo "========================================="
+          if which firefox > /dev/null; then
+            echo "Path: $(which firefox)"
+            firefox --version
+          else
+            echo "❌ Firefox not found."
+          fi
