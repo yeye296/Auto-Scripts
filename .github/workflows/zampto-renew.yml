@@ -3,7 +3,7 @@ name: Zampto Auto Renew
 on:
   workflow_dispatch:      # 允许手动点击按钮触发
   schedule:
-    - cron: '5 4 * * *'   # 每天凌晨自动运行
+    - cron: '55 3 * * *'   # 每天凌晨自动运行
 
 permissions:
   contents: write
