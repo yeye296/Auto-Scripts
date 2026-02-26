@@ -1,16 +1,19 @@
-name: Zampto Auto Renew
+name: Zampto 自动续期
 
 on:
-  workflow_dispatch:      # 允许手动点击按钮触发
   schedule:
-    - cron: '55 3 * * *'   # 每天凌晨自动运行
-
-permissions:
-  contents: write
+    - cron: '55 3 * * *'  # 每天北京时间 11:55 运行
+  workflow_dispatch:
 
 jobs:
-  run-renew:
+  renew:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: zampto-renew
+      cancel-in-progress: false
 
     steps:
       - name: Checkout private repo
@@ -20,11 +23,16 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: scripts
 
-      - name: Setup Python
+      - name: 设置 Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-        
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb unzip
+          pip install seleniumbase>=4.25.0 pyvirtualdisplay>=3.0 requests>=2.31.0
+
       - name: 安装并启动代理
         env:
           PROXY_NODE: ${{ secrets.PROXY_NODE }}
@@ -344,38 +352,28 @@ jobs:
           echo "--- Xray 日志 ---"
           cat xray.log
           exit 1
-          
-      - name: Install dependencies
-        working-directory: scripts
-        run: pip install -r requirements.txt -q > /dev/null 2>&1
-          
-      # 安装中文字体和 Chrome
-      - name: Install Chrome and Fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb fonts-noto-cjk
-          
-      # ----------------------------------------------------------------
-      # 2. 运行 Python 脚本容器
-      # ----------------------------------------------------------------
-      - name: Run renew script
-        working-directory: scripts
-        #timeout-minutes: 15  # ⚠️ 强烈建议：添加超时防止无限挂起浪费时长
-        env:
-          USERNAME: ${{ secrets.ZAMPTO_MAIL }}
-          PASSWORD: ${{ secrets.ZAMPTO_PASS }}
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_USERID: ${{ secrets.TG_USERID }}
-        run: |
-          export CHROME_PROXY="$PROXY_SOCKS5"
-          xvfb-run -a --server-args='-screen 0 1280x800x24' python zampto_server.py
-        
 
-      - name: 上传截图产物
-        if: always()
+      - name: 执行续期
+        env:
+          ZAMPTO_ACCOUNT: ${{ secrets.ZAMPTO_ACCOUNT }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          PROXY_SOCKS5: ${{ env.PROXY_SOCKS5 }}
+        run: python scripts/zampto_renew.py
+
+      - name: 上传截图
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: screenshots
-          path: scripts/screenshots/
-          if-no-files-found: ignore
-          retention-days: 7
+            name: screenshots-${{ github.run_number }}
+            path: output/screenshots/
+            retention-days: 3
+
+      - name: 清理旧运行
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          delete_workflow_pattern: ${{ github.workflow }}
+          retain_days: 0
+          keep_minimum_runs: 3
