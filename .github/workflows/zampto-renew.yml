@@ -70,14 +70,14 @@ jobs:
       - name: Install Chrome and Fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable xvfb fonts-noto-cjk
+          sudo apt-get install -y xvfb fonts-noto-cjk
           
       # ----------------------------------------------------------------
       # 2. 运行 Python 脚本容器
       # ----------------------------------------------------------------
       - name: Run renew script
         working-directory: scripts
-        timeout-minutes: 15  # ⚠️ 强烈建议：添加超时防止无限挂起浪费时长
+        #timeout-minutes: 15  # ⚠️ 强烈建议：添加超时防止无限挂起浪费时长
         env:
           USERNAME: ${{ secrets.ZAMPTO_MAIL }}
           PASSWORD: ${{ secrets.ZAMPTO_PASS }}
