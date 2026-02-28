@@ -354,6 +354,7 @@ jobs:
           exit 1
 
       - name: 执行续期
+        timeout-minutes: 15
         env:
           ZAMPTO_ACCOUNT: ${{ secrets.ZAMPTO_ACCOUNT }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
