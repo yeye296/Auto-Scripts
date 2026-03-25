@@ -79,13 +79,13 @@ jobs:
           echo "测试本地代理连通性..."
           curl -sx http://127.0.0.1:10808 https://api.ipify.org  
 
-      - name: Setup WARP
-        continue-on-error: true
-        timeout-minutes: 5
-        uses: fscarmen/warp-on-actions@v1.4
-        with:
-          stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
-          mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
+      # - name: Setup WARP
+      #   continue-on-error: true
+      #   timeout-minutes: 5
+      #   uses: fscarmen/warp-on-actions@v1.4
+      #   with:
+      #     stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
+      #     mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
 
       - name: Run renew script
         timeout-minutes: 15
