@@ -31,7 +31,7 @@ jobs:
         id: cache-nopecha
         uses: actions/cache@v4
         with:
-          path: nopecha_ext
+          path: scripts/${{ env.WORK_DIR }}/extensions
           key: nopecha-chromium-latest-v1
 
       - name: 🗂️ 缓存 ChromeDriver
@@ -65,6 +65,14 @@ jobs:
           rm -rf nopecha_ext_raw nopecha.zip
           python3 -c "import json;m=json.load(open('extensions/nopecha/manifest.json'));print('✅ 扩展加载：',m['name'],'v'+m['version'])"
 
+      - name: Setup WARP
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
+          mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
+
       - name: 🛡️ 启动 Gost 代理
         env:
             GOST_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
@@ -78,14 +86,6 @@ jobs:
           sleep 3
           echo "测试本地代理连通性..."
           curl -sx http://127.0.0.1:10808 https://api.ipify.org  
-
-      - name: Setup WARP
-        continue-on-error: true
-        timeout-minutes: 5
-        uses: fscarmen/warp-on-actions@v1.4
-        with:
-          stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
-          mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
 
       - name: Run renew script
         timeout-minutes: 15
