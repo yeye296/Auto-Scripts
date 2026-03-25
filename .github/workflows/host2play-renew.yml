@@ -12,6 +12,7 @@ jobs:
     # 👇 在这里定义全局变量，后续修改目录名只需改这一个地方
     env:
       WORK_DIR: host2play  # 你的目标子项目目录名
+      CHROME_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
 
     steps:
       - name: Checkout private repo
@@ -53,21 +54,6 @@ jobs:
         if: steps.cache-chromedriver.outputs.cache-hit != 'true'
         run: seleniumbase install chromedriver
 
-
-
-      # - name: 🛡️ 启动 Gost 代理
-      #   env:
-      #       GOST_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
-      #   run: |
-      #     wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
-      #     gunzip gost-linux-amd64-2.11.5.gz
-      #     chmod +x gost-linux-amd64-2.11.5 && mv gost-linux-amd64-2.11.5 gost
-      #     echo "启动 Gost 转发隧道..."
-      #     nohup ./gost -L http://:10808 -F="$GOST_PROXY" > gost.log 2>&1 &
-      #     sleep 3
-      #     echo "测试本地代理连通性..."
-      #     curl -sx http://127.0.0.1:10808 https://api.ipify.org  
-
       - name: 🧩 下载 NopeCHA 扩展
         if: steps.cache-nopecha.outputs.cache-hit != 'true'
         working-directory: scripts/${{ env.WORK_DIR }}
@@ -79,6 +65,19 @@ jobs:
           cp -r "$(dirname $MANIFEST)/." extensions/nopecha/
           rm -rf nopecha_ext_raw nopecha.zip
           python3 -c "import json;m=json.load(open('extensions/nopecha/manifest.json'));print('✅ 扩展加载：',m['name'],'v'+m['version'])"
+
+      - name: 🛡️ 启动 Gost 代理
+        # env:
+        #     CHROME_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
+        run: |
+          wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
+          gunzip gost-linux-amd64-2.11.5.gz
+          chmod +x gost-linux-amd64-2.11.5 && mv gost-linux-amd64-2.11.5 gost
+          echo "启动 Gost 转发隧道..."
+          nohup ./gost -L http://:10808 -F="$CHROME_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "测试本地代理连通性..."
+          curl -sx http://127.0.0.1:10808 https://api.ipify.org  
 
       - name: Setup WARP
         continue-on-error: true
