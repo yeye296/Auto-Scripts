@@ -1,0 +1,108 @@
+name: Host2Play Auto Renew
+
+on:
+  schedule:
+    - cron: '0 8 */2 * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    
+    # 👇 在这里定义全局变量，后续修改目录名只需改这一个地方
+    env:
+      WORK_DIR: host2play  # 你的目标子项目目录名
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🗂️ 缓存 NopeCHA 扩展
+        id: cache-nopecha
+        uses: actions/cache@v4
+        with:
+          path: nopecha_ext
+          key: nopecha-chromium-latest-v1
+
+      - name: 🗂️ 缓存 ChromeDriver
+        id: cache-chromedriver
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/seleniumbase/drivers
+          key: chromedriver-${{ runner.os }}
+
+      - name: 🛠️ 安装系统依赖
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable xvfb
+
+      - name: 🐍 安装 Python 依赖
+        run: pip install seleniumbase
+
+      - name: 🔧 安装 ChromeDriver
+        if: steps.cache-chromedriver.outputs.cache-hit != 'true'
+        run: seleniumbase install chromedriver
+
+
+
+      # - name: 🛡️ 启动 Gost 代理
+      #   env:
+      #       GOST_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
+      #   run: |
+      #     wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
+      #     gunzip gost-linux-amd64-2.11.5.gz
+      #     chmod +x gost-linux-amd64-2.11.5 && mv gost-linux-amd64-2.11.5 gost
+      #     echo "启动 Gost 转发隧道..."
+      #     nohup ./gost -L http://:10808 -F="$GOST_PROXY" > gost.log 2>&1 &
+      #     sleep 3
+      #     echo "测试本地代理连通性..."
+      #     curl -sx http://127.0.0.1:10808 https://api.ipify.org  
+
+      - name: 🧩 下载 NopeCHA 扩展
+        if: steps.cache-nopecha.outputs.cache-hit != 'true'
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: |
+          wget -q "https://github.com/NopeCHALLC/nopecha-extension/releases/latest/download/chromium.zip" -O nopecha.zip
+          unzip nopecha.zip -d nopecha_ext_raw
+          MANIFEST=$(find nopecha_ext_raw -name "manifest.json" | head -1)
+          mkdir -p extensions/nopecha
+          cp -r "$(dirname $MANIFEST)/." extensions/nopecha/
+          rm -rf nopecha_ext_raw nopecha.zip
+          python3 -c "import json;m=json.load(open('extensions/nopecha/manifest.json'));print('✅ 扩展加载：',m['name'],'v'+m['version'])"
+
+      # - name: Setup WARP
+      #   continue-on-error: true
+      #   timeout-minutes: 5
+      #   uses: fscarmen/warp-on-actions@v1.4
+      #   with:
+      #     stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
+      #     mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
+
+      - name: Run renew script
+        env:
+            PYTHONIOENCODING: utf-8
+            RENEW_URL: ${{ secrets.HOST2PLAY_RENEW_URL }}
+        # 👇 使用变量拼接路径
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
