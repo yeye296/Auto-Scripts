@@ -80,15 +80,16 @@ jobs:
           rm -rf nopecha_ext_raw nopecha.zip
           python3 -c "import json;m=json.load(open('extensions/nopecha/manifest.json'));print('✅ 扩展加载：',m['name'],'v'+m['version'])"
 
-      # - name: Setup WARP
-      #   continue-on-error: true
-      #   timeout-minutes: 5
-      #   uses: fscarmen/warp-on-actions@v1.4
-      #   with:
-      #     stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
-      #     mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
+      - name: Setup WARP
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
+          mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
 
       - name: Run renew script
+        timeout-minutes: 15
         env:
             PYTHONIOENCODING: utf-8
             RENEW_URL: ${{ secrets.HOST2PLAY_RENEW_URL }}
