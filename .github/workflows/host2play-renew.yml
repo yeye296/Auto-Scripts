@@ -34,13 +34,6 @@ jobs:
           path: scripts/${{ env.WORK_DIR }}/extensions
           key: nopecha-chromium-latest-v1
 
-      - name: 🗂️ 缓存 ChromeDriver
-        id: cache-chromedriver
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/seleniumbase/drivers
-          key: chromedriver-${{ runner.os }}
-
       - name: 🛠️ 安装系统依赖
         run: |
           sudo apt-get update -q
@@ -65,13 +58,13 @@ jobs:
           rm -rf nopecha_ext_raw nopecha.zip
           python3 -c "import json;m=json.load(open('extensions/nopecha/manifest.json'));print('✅ 扩展加载：',m['name'],'v'+m['version'])"
 
-      - name: Setup WARP
-        continue-on-error: true
-        timeout-minutes: 5
-        uses: fscarmen/warp-on-actions@v1.4
-        with:
-          stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
-          mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
+      # - name: Setup WARP
+      #   continue-on-error: true
+      #   timeout-minutes: 5
+      #   uses: fscarmen/warp-on-actions@v1.4
+      #   with:
+      #     stack: dual        # Optional. Support [ ipv4, ipv6, dual ]. Default is dual.
+      #     mode: wireguard    # Optional. Support [ wireguard, client ]. Default is wireguard. 
 
       - name: 🛡️ 启动 Gost 代理
         env:
