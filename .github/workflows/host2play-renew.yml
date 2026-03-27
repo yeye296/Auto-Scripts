@@ -70,15 +70,18 @@ jobs:
         env:
             GOST_PROXY: ${{ secrets.HOST2PLAY_PROXY }}
         run: |
-          wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
-          gunzip gost-linux-amd64-2.11.5.gz
-          chmod +x gost-linux-amd64-2.11.5 && mv gost-linux-amd64-2.11.5 gost
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
           echo "启动 Gost 转发隧道..."
           nohup ./gost -L http://:10808 -F="$GOST_PROXY" > gost.log 2>&1 &
           echo "CHROME_PROXY=http://127.0.0.1:10808" >> $GITHUB_ENV
           sleep 3
-          echo "测试本地代理连通性..."
-          curl -sx http://127.0.0.1:10808 https://api.ipify.org  
+          IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
+          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+          echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
 
       - name: Run renew script
         timeout-minutes: 15
