@@ -79,7 +79,7 @@ jobs:
           nohup ./gost -L http://:10808 -F="$GOST_PROXY" > gost.log 2>&1 &
           echo "CHROME_PROXY=http://127.0.0.1:10808" >> $GITHUB_ENV
           sleep 3
-          IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
+          IP=$(curl -s -x http://127.0.0.1:10808 https://api.ipify.org)
           IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
           echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
 
