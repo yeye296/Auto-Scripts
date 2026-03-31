@@ -53,7 +53,7 @@ jobs:
           SOLVER_URL: ${{ secrets.SOLVER_URL }}
         run: |
           wget -q "$SOLVER_URL" -O solver.zip
-          unzip solver.zip -d solver_raw
+          unzip -qq solver.zip -d solver_raw
           MANIFEST=$(find solver_raw -name "manifest.json" | head -1)
           mkdir -p captcha_solver
           cp -r "$(dirname $MANIFEST)/." captcha_solver/
