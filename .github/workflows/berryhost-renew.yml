@@ -30,7 +30,7 @@ jobs:
           sudo apt-get install -y xvfb fonts-noto-cjk
 
       - name: Install Python dependencies
-        working-directory: scripts/${{ env.WORK_DIR }}
+        working-directory: scripts/discord
         run: |
           pip install -r requirements.txt -q > /dev/null 2>&1
           seleniumbase install chromedriver
