@@ -30,7 +30,7 @@ jobs:
 
       - name: 🛠️ 安装依赖
         working-directory: scripts/${{ env.WORK_DIR }}
-        run: bash build.sh
+        run: bash build.sh > /dev/null 2>&1
 
       - name: 🛡️ 启动 Gost 代理
         env:
