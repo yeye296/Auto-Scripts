@@ -105,7 +105,7 @@ jobs:
             echo "⚠️ 警告：检测到凭证缺失！"
             exit 1
           fi
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
 
       - name: 上传截图产物
         if: always()
