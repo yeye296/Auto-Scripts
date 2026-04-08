@@ -71,7 +71,7 @@ jobs:
           
           if [ -f config.json ]; then
             echo "✅ 代理配置已生成:"
-            cat config.json
+            # cat config.json
             # 使用 nohup 启动
             nohup ./sing-box run -c config.json > singbox.log 2>&1 &
             echo "CHROME_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
