@@ -2,7 +2,7 @@ name: Eternodes 续期
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 3 */28 * *'   # 每28天 UTC 03:00 执行
+    - cron: '0 3 14,19 * *'   # 每28天 UTC 03:00 执行
 
 jobs:
   renew:
