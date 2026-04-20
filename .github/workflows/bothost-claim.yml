@@ -37,7 +37,8 @@ jobs:
             GOST_PROXY: ${{ secrets.DS_PROXY }}
         run: |
           if [ -z "$GOST_PROXY" ]; then exit 1; fi
-          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          VERSION=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          VERSION=${VERSION:-2.11.5}
           echo "📦 GOST 版本: $VERSION"
           wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
           tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
