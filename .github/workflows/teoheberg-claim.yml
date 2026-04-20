@@ -1,0 +1,109 @@
+name: TeoHeberg 自动领取
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: teoheberg
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 安装 Python 依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: |
+          pip install -r requirements.txt -q
+
+      - name: 💾 获取 Playwright 版本
+        id: playwright-version
+        run: echo "version=$(playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: 📁 缓存 Playwright 浏览器
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: 🛠️ 安装系统依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh
+
+      - name: 启用 WARP
+        uses: fscarmen/warp-on-actions@v1.3
+        with:
+          stack: dual
+          mode: client
+
+      - name: 配置 DNS 并验证 WARP
+        run: |
+          set -euo pipefail
+          sudo systemctl stop systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+          sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+          sleep 3
+          for i in {1..30}; do
+            status=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -oP 'warp=\K\w+' || echo unknown)
+            [[ "$status" =~ ^(on|plus)$ ]] && echo "WARP 已连接" && break
+            echo "WARP 连接中... ($i/30)"
+            sleep 2
+          done
+          echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
+
+      - name: 🎮 执行每日领取
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONIOENCODING: utf-8
+          USERNAME: ${{ secrets.TEOHEBERG_MAIL }}
+          PASSWORD: ${{ secrets.TEOHEBERG_PASS }}
+          PANEL_URL: ${{ secrets.TEOHEBERG_PANEL_URL }}
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
+
+      - name: Commit and Push Cookie Update
+        if: success()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
