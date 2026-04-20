@@ -45,7 +45,7 @@ jobs:
 
       - name: 🛠️ 安装系统依赖
         working-directory: scripts/${{ env.WORK_DIR }}
-        run: bash build.sh
+        run: bash build.sh > /dev/null 2>&1
 
       - name: 启用 WARP
         uses: fscarmen/warp-on-actions@v1.3
