@@ -45,7 +45,7 @@ jobs:
           python -u app.py
 
       - name: Commit and Push Cookie Update
-        if: success()
+        if: always()
         # 保持在仓库根目录操作 git
         working-directory: scripts
         run: |
