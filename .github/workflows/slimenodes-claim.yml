@@ -63,7 +63,7 @@ jobs:
       - name: 🛡️ 启动 Sing-Box 代理
         working-directory: scripts/utils
         env:
-          PROXY_URL: ${{ secrets.BOT_HOST_PROXY }}
+          PROXY_URL: ${{ secrets.SLIMENODES_PROXY }}
         run: |
           if [ -z "$PROXY_URL" ]; then exit 0; fi
           
