@@ -45,7 +45,7 @@ jobs:
 
       - name: 🛠️ 安装依赖
         working-directory: scripts/${{ env.WORK_DIR }}
-        run: bash build.sh > /dev/null 2>&1
+        run: bash build.sh
 
       - name: 🛡️ 启动 Gost 代理
         env:
@@ -99,7 +99,7 @@ jobs:
           echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
 
       - name: 🎮 执行每日领取
-        timeout-minutes: 15
+        timeout-minutes: 10
         working-directory: scripts/${{ env.WORK_DIR }}
         env:
           PYTHONIOENCODING: utf-8
