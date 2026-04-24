@@ -102,7 +102,7 @@ jobs:
         timeout-minutes: 10
         working-directory: scripts/${{ env.WORK_DIR }}
         env:
-          PYTHONIOENCODING: utf-8
+          PYTHONUNBUFFERED: "1"
           DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result).token }}
         run: |
           if [[ -z "$DISCORD_TOKEN" ]]; then
