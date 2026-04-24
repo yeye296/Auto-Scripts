@@ -45,7 +45,7 @@ jobs:
 
       - name: 🛠️ 安装依赖
         working-directory: scripts/${{ env.WORK_DIR }}
-        run: bash build.sh
+        run: bash build.sh > /dev/null 2>&1
 
       - name: 🛡️ 启动 Gost 代理
         env:
@@ -109,7 +109,8 @@ jobs:
             echo "⚠️ 警告：检测到凭证缺失！"
             exit 1
           fi
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            stdbuf -oL -eL python app.py
 
       - name: Commit and Push Cookie Update
         if: always()
