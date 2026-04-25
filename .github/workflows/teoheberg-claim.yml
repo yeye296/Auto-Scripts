@@ -82,7 +82,7 @@ jobs:
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
 
       - name: Commit and Push Cookie Update
-        if: success()
+        if: always()
         # 保持在仓库根目录操作 git
         working-directory: scripts
         run: |
