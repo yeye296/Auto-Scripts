@@ -13,11 +13,6 @@ jobs:
     # 👇 在这里定义全局变量，后续修改目录名只需改这一个地方
     env:
       WORK_DIR: justrunmy  # 你的目标子项目目录名
-      
-      # 密钥环境变量（保持不变，供后续步骤调用）
-      USERNAME: ${{ secrets.JUSTRUNMY_MAIL }}
-      PASSWORD: ${{ secrets.JUSTRUNMY_PASS }}
-      PANEL_URL: ${{ secrets.JUSTRUNMY_PANEL_URL }}
 
     steps:
       - name: Checkout private repo
@@ -41,10 +36,14 @@ jobs:
       - name: Run renew script
         # 👇 使用变量拼接路径
         working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+            USERNAME: ${{ secrets.JUSTRUNMY_MAIL }}
+            PASSWORD: ${{ secrets.JUSTRUNMY_PASS }}
+            PANEL_URL: ${{ secrets.JUSTRUNMY_PANEL_URL }}
         run: python app.py
 
       - name: Commit and Push Cookie Update
-        if: success()
+        if: always()
         # 保持在仓库根目录操作 git
         working-directory: scripts
         run: |
