@@ -1,0 +1,125 @@
+name: Firecone 自动领取
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 2 * * *'
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: firecone
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🛡️ 启动 Gost 代理
+        env:
+            GOST_PROXY: ${{ secrets.DS_PROXY }}
+        run: |
+          if [ -z "$GOST_PROXY" ]; then exit 1; fi
+          VERSION=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          VERSION=${VERSION:-2.11.5}
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          echo "启动 Gost 转发隧道..."
+          nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
+          echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
+          sleep 3
+          IP=$(curl -s -x http://127.0.0.1:9090 https://api.ipify.org)
+          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+          echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      - name: Run Python script
+        id: py_step
+        working-directory: scripts/discord
+        env:
+            PYTHONIOENCODING: utf-8
+            DS_USERNAME: ${{ secrets.DS_USERNAME }}
+            DS_PASSWORD: ${{ secrets.DS_PASSWORD }}
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+
+      - name: 启用 WARP
+        uses: fscarmen/warp-on-actions@v1.3
+        with:
+          stack: dual
+          mode: client
+
+      - name: 配置 DNS 并验证 WARP
+        run: |
+          set -euo pipefail
+          sudo systemctl stop systemd-resolved 2>/dev/null || true
+          sudo systemctl disable systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+          sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+          sleep 3
+          for i in {1..30}; do
+            status=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -oP 'warp=\K\w+' || echo unknown)
+            [[ "$status" =~ ^(on|plus)$ ]] && echo "WARP 已连接" && break
+            echo "WARP 连接中... ($i/30)"
+            sleep 2
+          done
+          echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
+
+      - name: 🎮 执行每日领取
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONUNBUFFERED: "1"
+          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result).token }}
+        run: |
+          if [[ -z "$DISCORD_TOKEN" ]]; then
+            echo "⚠️ 警告：检测到凭证缺失！"
+            exit 1
+          fi
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
+
+      - name: Commit and Push Cookie Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
