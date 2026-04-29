@@ -1,0 +1,144 @@
+name: SlimeNodes 自动领取
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 4'
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: slimenodes
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🛡️ 启动 Sing-Box 代理
+        working-directory: scripts/utils
+        env:
+          PROXY_URL: ${{ secrets.SLIMENODES_PROXY }}
+        run: |
+          if [ -z "$PROXY_URL" ]; then exit 0; fi
+          
+          # 下载特定版本的 sing-box
+          SINGBOX_VER="1.11.0"
+          echo "📦 下载 sing-box v${SINGBOX_VER}..."
+          wget -q "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
+          tar -xzf "sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
+          mv "sing-box-${SINGBOX_VER}-linux-amd64/sing-box" ./sing-box
+          chmod +x ./sing-box
+          
+          # 生成配置
+          echo "🔗 解析代理协议..."
+          python3 proxy_handler.py
+          
+          if [ -f config.json ]; then
+            echo "✅ 代理配置已生成:"
+            # cat config.json
+            # 使用 nohup 启动
+            nohup ./sing-box run -c config.json > singbox.log 2>&1 &
+            echo "CHROME_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
+            # echo "CHROME_PROXY=socks5://127.0.0.1:8081" >> $GITHUB_ENV
+            sleep 10
+            if ps aux | grep -v grep | grep "sing-box run"; then
+              echo "✅ Sing-Box 启动成功"
+            else
+              echo "❌ Sing-Box 启动失败："
+              cat singbox.log
+              exit 1
+            fi
+            IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
+            IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+            echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+          else
+            echo "❌ 代理配置生成失败"
+            exit 1
+          fi
+
+      - name: 🛡️ 启动 Gost 代理
+        env:
+            GOST_PROXY: ${{ secrets.DS_PROXY }}
+        run: |
+          if [ -z "$GOST_PROXY" ]; then exit 1; fi
+          VERSION=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          VERSION=${VERSION:-2.12.0}
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          echo "启动 Gost 转发隧道..."
+          nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
+          echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
+          sleep 3
+          IP=$(curl -s -x http://127.0.0.1:9090 https://api.ipify.org)
+          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+          echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      - name: Run Python script
+        id: py_step
+        working-directory: scripts/discord
+        env:
+            PYTHONIOENCODING: utf-8
+            DS_USERNAME: ${{ secrets.DS_USERNAME }}
+            DS_PASSWORD: ${{ secrets.DS_PASSWORD }}
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+
+      - name: 🎮 执行每日领取
+        timeout-minutes: 10
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONUNBUFFERED: "1"
+          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result).token }}
+        run: |
+          if [[ -z "$DISCORD_TOKEN" ]]; then
+            echo "⚠️ 警告：检测到凭证缺失！"
+            exit 1
+          fi
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
+
+      - name: Commit and Push Cookie Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
