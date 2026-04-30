@@ -3,7 +3,7 @@ name: GameServer-Start
 on:
   workflow_dispatch:
   schedule:
-    - cron: '7 0 * * *'
+    - cron: '37 23 * * *'
 
 jobs:
   run_start:
