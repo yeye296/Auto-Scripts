@@ -3,7 +3,7 @@ name: SlimeNodes 自动领取
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * 4'
+    - cron: '0 6 * * *'
 
 jobs:
   claim:
