@@ -3,7 +3,7 @@ name: Firecone 自动领取
 on:
   workflow_dispatch:
   schedule:
-    - cron: '7 6,18 * * *'
+    - cron: '27 6,18 * * *'
 
 jobs:
   claim:
