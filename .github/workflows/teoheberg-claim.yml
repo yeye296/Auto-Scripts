@@ -3,7 +3,7 @@ name: TeoHeberg 自动领取
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 15,9 * * *'
+    - cron: '20 15,9 * * *'
 
 jobs:
   claim:
