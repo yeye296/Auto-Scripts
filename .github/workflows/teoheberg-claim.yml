@@ -2,8 +2,8 @@ name: TeoHeberg 自动领取
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '20 21,9 * * *'
+  # schedule:
+  #   - cron: '20 21,9 * * *'
 
 jobs:
   claim:
