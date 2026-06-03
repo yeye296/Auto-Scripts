@@ -41,8 +41,8 @@ jobs:
           echo "启动 Gost 转发隧道..."
           nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
           echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
-          sleep 3
-          IP=$(curl -s --retry 5 --retry-delay 3 -x http://127.0.0.1:9090 https://api.ipify.org)
+          sleep 5
+          IP=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors -x http://127.0.0.1:9090 https://api.ipify.org)
           IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
           echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
 
