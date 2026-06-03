@@ -54,9 +54,9 @@ jobs:
           echo "启动 Gost 转发隧道..."
           nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
           echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
-          sleep 3
+          sleep 5
           echo "✅ GOST 已启动，测试连通性..."
-          curl -s --retry 5 --retry-delay 3 -x http://127.0.0.1:9090 https://api.ipify.org | sed 's/\.[0-9]*$/.**/' && echo
+          curl -s --retry 5 --retry-delay 3 --retry-all-errors -x http://127.0.0.1:9090 https://api.ipify.org | sed 's/\.[0-9]*$/.**/' && echo
 
       - name: Run Python script
         id: py_step
