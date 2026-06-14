@@ -71,7 +71,7 @@ jobs:
             echo "⚠️ 警告：检测到凭证缺失！"
             exit 1
           fi
-          python app.py
+          xvfb-run -a python app.py
 
       - name: Commit and Push Cookie Update
         if: always()
