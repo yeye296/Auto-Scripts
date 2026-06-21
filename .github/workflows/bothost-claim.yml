@@ -28,39 +28,62 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 🛡️ 启动 Sing-Box 代理
-        working-directory: scripts/utils
+      - name: 🛡️ 启动 Xray 代理
         env:
-          PROXY_URL: ${{ secrets.BOT_HOST_PROXY }}
+          XRAY_CONFIG: ${{ secrets.BOT_HOST_PROXY }}
         run: |
-          if [ -z "$PROXY_URL" ]; then exit 0; fi
+          if [ -z "$XRAY_CONFIG" ]; then exit 0; fi
           
-          # 下载特定版本的 sing-box
-          SINGBOX_VER="1.11.0"
-          echo "📦 下载 sing-box v${SINGBOX_VER}..."
-          wget -q "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
-          tar -xzf "sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
-          mv "sing-box-${SINGBOX_VER}-linux-amd64/sing-box" ./sing-box
-          chmod +x ./sing-box
+          echo "📦 下载并解压 Xray-core..."
+          wget -q https://github.com/XTLS/Xray-core/releases/download/v25.12.8/Xray-linux-64.zip
+          unzip -q Xray-linux-64.zip -d xray-core
           
-          # 生成配置
-          echo "🔗 解析代理协议..."
-          python3 proxy_handler.py
+          echo "📝 写入节点配置..."
+          echo "$XRAY_CONFIG" > xray-core/config.json
           
-          if [ -f config.json ]; then
-            echo "✅ 代理配置已生成:"
-            # cat config.json
-            # 使用 nohup 启动
-            nohup ./sing-box run -c config.json > singbox.log 2>&1 &
-            echo "CHROME_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
-            sleep 5
-            IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
-            IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
-            echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
-          else
-            echo "❌ 代理配置生成失败"
-            exit 1
-          fi
+          echo "🚀 启动 Xray 服务..."
+          cd xray-core
+          nohup ./xray run -c config.json > xray.log 2>&1 &
+          echo "CHROME_PROXY=http://127.0.0.1:10808" >> $GITHUB_ENV
+          sleep 5
+          IP=$(curl -s -x http://127.0.0.1:10808 https://api.ipify.org)
+          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+          echo "✅ Xray 已启动，出口IP确认：$IP_MASKED"
+
+
+      # - name: 🛡️ 启动 Sing-Box 代理
+      #   working-directory: scripts/utils
+      #   env:
+      #     PROXY_URL: ${{ secrets.BOT_HOST_PROXY }}
+      #   run: |
+      #     if [ -z "$PROXY_URL" ]; then exit 0; fi
+          
+      #     # 下载特定版本的 sing-box
+      #     SINGBOX_VER="1.11.0"
+      #     echo "📦 下载 sing-box v${SINGBOX_VER}..."
+      #     wget -q "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
+      #     tar -xzf "sing-box-${SINGBOX_VER}-linux-amd64.tar.gz"
+      #     mv "sing-box-${SINGBOX_VER}-linux-amd64/sing-box" ./sing-box
+      #     chmod +x ./sing-box
+          
+      #     # 生成配置
+      #     echo "🔗 解析代理协议..."
+      #     python3 proxy_handler.py
+          
+      #     if [ -f config.json ]; then
+      #       echo "✅ 代理配置已生成:"
+      #       # cat config.json
+      #       # 使用 nohup 启动
+      #       nohup ./sing-box run -c config.json > singbox.log 2>&1 &
+      #       echo "CHROME_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
+      #       sleep 5
+      #       IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
+      #       IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+      #       echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+      #     else
+      #       echo "❌ 代理配置生成失败"
+      #       exit 1
+      #     fi
 
       - name: 🛡️ 启动 Gost 代理
         env:
