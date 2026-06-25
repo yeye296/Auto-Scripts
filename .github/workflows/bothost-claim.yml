@@ -33,23 +33,18 @@ jobs:
       #     XRAY_CONFIG: ${{ secrets.BOT_HOST_PROXY }}
       #   run: |
       #     if [ -z "$XRAY_CONFIG" ]; then exit 0; fi
-          
       #     echo "📦 下载并解压 Xray-core..."
-      #     wget -q https://github.com/XTLS/Xray-core/releases/download/v25.12.8/Xray-linux-64.zip
-      #     unzip -q Xray-linux-64.zip -d xray-core
-          
+      #     wget -q https://github.com/XTLS/Xray-core/releases/download/v25.12.8/Xray-linux-64.zip -O xray.zip
+      #     unzip -q xray.zip && chmod +x xray
       #     echo "📝 写入节点配置..."
-      #     echo "$XRAY_CONFIG" > xray-core/config.json
-          
+      #     echo "$XRAY_CONFIG" > config.json
       #     echo "🚀 启动 Xray 服务..."
-      #     cd xray-core
       #     nohup ./xray run -c config.json > xray.log 2>&1 &
       #     echo "CHROME_PROXY=http://127.0.0.1:10808" >> $GITHUB_ENV
       #     sleep 5
       #     IP=$(curl -s -x http://127.0.0.1:10808 https://api.ipify.org)
       #     IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
       #     echo "✅ Xray 已启动，出口IP确认：$IP_MASKED"
-
 
       - name: 🛡️ 启动 Sing-Box 代理
         working-directory: scripts/utils
