@@ -41,7 +41,7 @@ jobs:
           nohup ./xray run -c config.json > xray.log 2>&1 &
           echo "CHROME_PROXY=http://127.0.0.1:10808" >> $GITHUB_ENV
           sleep 5
-          IP=$(curl -s -x http://127.0.0.1:10808 https://api.ipify.org)
+          IP=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors -x http://127.0.0.1:10808 https://api.ipify.org)
           IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
           echo "✅ Xray 已启动，出口IP确认：$IP_MASKED"
 
