@@ -86,7 +86,7 @@ jobs:
             echo "CHROME_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
             sleep 5
             IP=$(curl -s -x http://127.0.0.1:8080 https://api.ipify.org)
-            IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+            IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
             echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
           else
             echo "❌ 代理配置生成失败"
