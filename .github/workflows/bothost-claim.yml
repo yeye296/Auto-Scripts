@@ -49,9 +49,22 @@ jobs:
       - name: 🛡️ 启动 Sing-Box 代理
         working-directory: scripts/utils
         env:
-          PROXY_URL: ${{ secrets.BOT_HOST_PROXY }}
+          PROXY_URL1: ${{ secrets.BOT_HOST_PROXY }}
+          PROXY_URL2: ${{ secrets.BOT_HOST_PROXY1 }}
         run: |
-          if [ -z "$PROXY_URL" ]; then exit 0; fi
+          SH_EPOCH_DAY=$(( ($(date +%s) + 28800) / 86400 ))
+          if [ $((SH_EPOCH_DAY  % 2)) -eq 0 ]; then
+            export PROXY_URL="$PROXY_URL1"
+            echo "📅 今天轮换至代理 1 ($SH_EPOCH_DAY)"
+          else
+            export PROXY_URL="$PROXY_URL2"
+            echo "📅 今天轮换至代理 2 ($SH_EPOCH_DAY)"
+          fi
+
+          if [ -z "$PROXY_URL" ]; then 
+            echo "⚠️ 未配置当前轮换的代理，不启用代理。"
+            exit 0
+          fi
           
           # 下载特定版本的 sing-box
           SINGBOX_VER="1.11.0"
