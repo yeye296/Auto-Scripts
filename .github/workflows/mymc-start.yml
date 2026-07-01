@@ -1,0 +1,33 @@
+name: MyMc-Start
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run_start:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WORK_DIR: mymc
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Node.js Version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22' # 显式指定使用 Node.js 22 版本
+
+      - name: 📦 安装 Node.js 依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: npm install ws
+
+      - name: 🚀 运行脚本
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: node index.js
