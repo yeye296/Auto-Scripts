@@ -1,0 +1,106 @@
+name: Zampto Auto Renew
+
+on:
+  workflow_dispatch:      # 允许手动点击按钮触发
+  schedule:
+    - cron: '55 3 * * *'   # 每天凌晨自动运行
+
+permissions:
+  contents: write
+
+jobs:
+  run-renew:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/zampto_renew  # 私库的仓库位置
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # ----------------------------------------------------------------
+      # 1. 环境检查与 Gost 代理服务启动
+      # ----------------------------------------------------------------
+      - name: 准备代理环境
+        id: proxy-setup
+        env:
+          RAW_PROXY: ${{ secrets.CHROME_PROXY }}
+        run: |
+          # 检查是否设置了代理
+          if [ -z "$RAW_PROXY" ]; then
+            echo "ℹ️ 未配置 CHROME_PROXY，将使用直连模式。"
+            echo "USE_LOCAL_PROXY=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          echo "🌐 检测到代理配置，正在安装 Gost..."
+          
+          # 下载并安装 Gost
+          wget -q -O gost.gz https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
+          gunzip gost.gz
+          chmod +x gost
+          
+          # 启动后台转发: 监听 8888 -> 转发给 secrets 中的代理
+          nohup ./gost -L=:8888 -F="$RAW_PROXY" > /dev/null 2>&1 &
+          
+          # 等待服务就绪
+          sleep 3
+          
+          # 简单测试一下端口是否通
+          if nc -z 127.0.0.1 8888; then
+            echo "✅ 本地代理服务启动成功: 127.0.0.1:8888"
+            echo "USE_LOCAL_PROXY=true" >> $GITHUB_ENV
+          else
+            echo "❌ Gost 启动失败，端口未开放。"
+            exit 1
+          fi
+          
+      - name: Install dependencies
+        working-directory: scripts
+        run: pip install -r requirements.txt -q > /dev/null 2>&1
+          
+      # 安装中文字体和 Chrome
+      - name: Install Chrome and Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb fonts-noto-cjk
+          
+      # ----------------------------------------------------------------
+      # 2. 运行 Python 脚本容器
+      # ----------------------------------------------------------------
+      - name: Run renew script
+        working-directory: scripts
+        #timeout-minutes: 15  # ⚠️ 强烈建议：添加超时防止无限挂起浪费时长
+        env:
+          USERNAME: ${{ secrets.ZAMPTO_MAIL }}
+          PASSWORD: ${{ secrets.ZAMPTO_PASS }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_USERID: ${{ secrets.TG_USERID }}
+        run: |
+          # 动态决定传给容器的代理地址
+          if [ "$USE_LOCAL_PROXY" == "true" ]; then
+            FINAL_PROXY="http://127.0.0.1:8888"
+            echo "🚀 容器将使用本地转发代理: $FINAL_PROXY"
+          else
+            FINAL_PROXY=""
+            echo "🚀 容器将使用直连模式"
+          fi
+          export CHROME_PROXY="$FINAL_PROXY"
+          xvfb-run -a --server-args='-screen 0 1280x800x24' python zampto_server.py
+        
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: scripts/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
