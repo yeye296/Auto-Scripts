@@ -116,7 +116,7 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          if [[ -z "$DISCORD_TOKEN" || -z "$REPO_TOKEN" ]]; then
+          if [[ -z "$DISCORD_TOKEN" || -z "$GH_TOKEN" ]]; then
             echo "⚠️ 警告：检测到凭证缺失！"
             exit 1
           fi
