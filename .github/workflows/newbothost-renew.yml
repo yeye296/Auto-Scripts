@@ -1,0 +1,142 @@
+name: Auto Renew New-Bot-Hosting
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 */2 * *'
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: newbothost
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # - name: 🛡️ 启动 Sing-Box 代理
+      #   working-directory: scripts/utils
+      #   env:
+      #     NODE_LINK: ${{ secrets.NEW_BOT_HOST_PROXY }}
+      #   run: |
+      #     bash setup_proxy.sh
+          
+      #     echo "[INFO] 测试代理连接..."
+      #     if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
+      #         echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+      #         IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
+      #         echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+      #         exit 0
+      #     else
+      #         echo "[ERROR] ❌ 代理连接失败"
+      #         echo "---- sing-box 日志 ----"
+      #         cat sing-box.log
+      #         exit 1
+      #     fi
+          
+      - name: 🛡️ 启动 Gost 代理
+        env:
+            GOST_PROXY: ${{ secrets.DS_PROXY }}
+        run: |
+          if [ -z "$GOST_PROXY" ]; then exit 1; fi
+          VERSION=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          VERSION=${VERSION:-2.12.0}
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          echo "启动 Gost 转发隧道..."
+          nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
+          echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
+          sleep 5
+          IP=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors -x http://127.0.0.1:9090 https://api.ipify.org)
+          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
+          echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      - name: Run Python script
+        id: py_step
+        working-directory: scripts/discord
+        env:
+            PYTHONIOENCODING: utf-8
+            DS_USERNAME: ${{ secrets.DS_USERNAME }}
+            DS_PASSWORD: ${{ secrets.DS_PASSWORD }}
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+
+      - name: 启用 WARP
+        uses: fscarmen/warp-on-actions@v1.3
+        with:
+          stack: dual
+          mode: client
+
+      - name: 配置 DNS 并验证 WARP
+        run: |
+          set -euo pipefail
+          sudo systemctl stop systemd-resolved 2>/dev/null || true
+          sudo systemctl disable systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 1.0.0.1" | sudo tee /etc/resolv.conf
+          sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+          sleep 3
+          # echo "[INFO] DNS 测试:"
+          # nslookup dashboard.katabump.com 1.1.1.1 || echo "[WARN] 解析失败"
+          # echo ""
+          for i in {1..30}; do
+            status=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -oP 'warp=\K\w+' || echo unknown)
+            [[ "$status" =~ ^(on|plus)$ ]] && echo "WARP 已连接" && break
+            echo "WARP 连接中... ($i/30)"
+            sleep 2
+          done
+          echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
+
+      - name: 🚀 运行续期脚本
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result).token }}
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          SESSION_TOKEN: ${{ secrets.NEW_BOT_SESSION_TOKEN }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          if [[ -z "$DISCORD_TOKEN" || -z "$REPO_TOKEN" ]]; then
+            echo "⚠️ 警告：检测到凭证缺失！"
+            exit 1
+          fi
+          xvfb-run --auto-servernum python3 app.py
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_number }}
+          # 👇 仅匹配该目录下的 png 文件
+          path: scripts/${{ env.WORK_DIR }}/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 🧽 清理进程和临时文件
+        if: always()
+        run: |
+          pkill -f sing-box || true
+          pkill -f chromedriver || true
+          pkill -f chrome || true
+          pkill -f Xvfb || true
+          rm -f sing-box sing-box-config.json sing-box.log
