@@ -3,7 +3,7 @@ name: MyMc-Start
 on:
   workflow_dispatch:
   schedule:
-    - cron: '42 0 * * *'
+    - cron: '52 0 * * *'
 
 jobs:
   run_start:
