@@ -1,0 +1,78 @@
+name: MT Auto SignIn
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  signin:
+    runs-on: ubuntu-latest
+    
+    env:
+      WORK_DIR: mt
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      # - name: 配置 DNS
+      #   run: |
+      #     set -euo pipefail
+      #     sudo systemctl stop systemd-resolved 2>/dev/null || true
+      #     sudo systemctl disable systemd-resolved 2>/dev/null || true
+      #     sudo rm -f /etc/resolv.conf
+      #     echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+      #     sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+
+      - name: Run signin script
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: node index.js
+
+      - name: Commit and Push State Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          STATE_JSON="${WORK_DIR}/state.json"
+          if [[ -n $(git status -s "$STATE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $STATE_JSON 更新"
+            git add "$STATE_JSON"
+            echo "正在提交 State..."
+            git commit -m "Auto-update auth State in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "State 无变化，跳过提交。"
+          fi
+
+      # - name: 上传截图产物
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: screenshots-${{ github.run_number }}
+      #     # 👇 使用变量拼接路径
+      #     path: scripts/${{ env.WORK_DIR }}/*.png
+      #     if-no-files-found: ignore
+      #     retention-days: 7
