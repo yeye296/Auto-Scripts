@@ -1,8 +1,8 @@
 name: MT Auto SignIn
 
 on:
-  schedule:
-    - cron: '0 1 * * *'
+  # schedule:
+  #   - cron: '0 1 * * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
