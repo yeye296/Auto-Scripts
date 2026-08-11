@@ -1,0 +1,82 @@
+name: fenixhost 自动续期
+
+on:
+  schedule:
+    - cron: '0 2 * * 2,5'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: fenixhost
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🛠️ 安装依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          pip install --upgrade pip seleniumbase beautifulsoup4 "requests[socks]" -q
+          python -m seleniumbase install chromedriver
+
+      # - name: 🟡 Setup Official WARP Proxy (纯 SOCKS5 模式)
+      #   run: |
+      #     # 导入 Cloudflare 官方源并安装
+      #     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+      #     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+      #     sudo apt-get update && sudo apt-get install -y cloudflare-warp
+          
+      #     # 注册并设置为纯代理模式 (默认占用 40000 端口，绝不断网)
+      #     warp-cli --accept-tos registration new
+      #     warp-cli --accept-tos mode proxy
+      #     # warp-cli --accept-tos proxy port 40000
+      #     warp-cli --accept-tos connect
+          
+      #     echo "⏳ 等待 WARP 隧道建立 (10秒)..."
+      #     sleep 10
+      #     echo "🌍 验证 WARP SOCKS5 代理 IP:"
+      #     curl -s -x socks5://127.0.0.1:40000 https://api.ipify.org || echo "⚠️ IP获取失败"
+      #     echo ""
+
+      - name: 🎮 执行续期任务
+        timeout-minutes: 10
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONIOENCODING: utf-8
+          USERNAME: ${{ secrets.FENIXHOST_EMAIL }}
+          PASSWORD: ${{ secrets.FENIXHOST_PASS }}
+          # CHROME_PROXY: "socks5://127.0.0.1:40000"
+        run: python app.py
+
+      - name: Commit and Push State Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          STATE_JSON="${WORK_DIR}/state.json"
+          if [[ -n $(git status -s "$STATE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $STATE_JSON 更新"
+            git add "$STATE_JSON"
+            echo "正在提交 State..."
+            git commit -m "Auto-update auth State in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "State 无变化，跳过提交。"
+          fi
