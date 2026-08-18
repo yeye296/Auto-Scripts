@@ -2,7 +2,7 @@ name: Scyed 自动续期
 
 on:
   schedule:
-    - cron: '17 8 6 * *'
+    - cron: '17 8 14,28 * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-          pip install --upgrade pip seleniumbase cryptography "requests[socks]" -q
+          pip install --upgrade pip seleniumbase "requests[socks]" -q
           python -m seleniumbase install chromedriver
 
       - name: 🟡 Setup Official WARP Proxy (纯 SOCKS5 模式)
