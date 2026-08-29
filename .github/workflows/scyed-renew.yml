@@ -2,7 +2,7 @@ name: Scyed 自动续期
 
 on:
   schedule:
-    - cron: '17 8 14,28 * *'
+    - cron: '17 8 1,15 * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
@@ -27,6 +27,26 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 🛡️ 启动 Sing-Box 代理
+        working-directory: scripts/utils
+        env:
+          NODE_LINK: ${{ secrets.SCYED_PROXY }}
+        run: |
+          bash setup_proxy.sh
+          
+          echo "[INFO] 测试代理连接..."
+          if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
+              echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+              IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
+              echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+              exit 0
+          else
+              echo "[ERROR] ❌ 代理连接失败"
+              echo "---- sing-box 日志 ----"
+              cat sing-box.log
+              exit 1
+          fi
+
       - name: 🛠️ 安装依赖
         run: |
           sudo apt-get update
@@ -34,24 +54,24 @@ jobs:
           pip install --upgrade pip seleniumbase "requests[socks]" -q
           python -m seleniumbase install chromedriver
 
-      - name: 🟡 Setup Official WARP Proxy (纯 SOCKS5 模式)
-        run: |
-          # 导入 Cloudflare 官方源并安装
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          sudo apt-get update && sudo apt-get install -y cloudflare-warp
+      # - name: 🟡 Setup Official WARP Proxy (纯 SOCKS5 模式)
+      #   run: |
+      #     # 导入 Cloudflare 官方源并安装
+      #     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+      #     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+      #     sudo apt-get update && sudo apt-get install -y cloudflare-warp
           
-          # 注册并设置为纯代理模式 (默认占用 40000 端口，绝不断网)
-          warp-cli --accept-tos registration new
-          warp-cli --accept-tos mode proxy
-          # warp-cli --accept-tos proxy port 40000
-          warp-cli --accept-tos connect
+      #     # 注册并设置为纯代理模式 (默认占用 40000 端口，绝不断网)
+      #     warp-cli --accept-tos registration new
+      #     warp-cli --accept-tos mode proxy
+      #     # warp-cli --accept-tos proxy port 40000
+      #     warp-cli --accept-tos connect
           
-          echo "⏳ 等待 WARP 隧道建立 (10秒)..."
-          sleep 10
-          echo "🌍 验证 WARP SOCKS5 代理 IP:"
-          curl -s -x socks5://127.0.0.1:40000 https://api.ipify.org || echo "⚠️ IP获取失败"
-          echo ""
+      #     echo "⏳ 等待 WARP 隧道建立 (10秒)..."
+      #     sleep 10
+      #     echo "🌍 验证 WARP SOCKS5 代理 IP:"
+      #     curl -s -x socks5://127.0.0.1:40000 https://api.ipify.org || echo "⚠️ IP获取失败"
+      #     echo ""
 
       - name: 🎮 执行续期任务
         timeout-minutes: 10
@@ -60,7 +80,7 @@ jobs:
           PYTHONIOENCODING: utf-8
           USERNAME: ${{ secrets.SCYED_USER }}
           PASSWORD: ${{ secrets.SCYED_PASS }}
-          CHROME_PROXY: "socks5://127.0.0.1:40000"
+          # CHROME_PROXY: "socks5://127.0.0.1:40000"
         run: python app.py
 
       - name: Commit and Push State Update
