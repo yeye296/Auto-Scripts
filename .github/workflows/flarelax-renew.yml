@@ -110,15 +110,15 @@ jobs:
             echo "State 无变化，跳过提交。"
           fi
 
-      # - name: 上传截图产物
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: screenshots-${{ github.run_number }}
-      #     # 👇 仅匹配该目录下的 png 文件
-      #     path: scripts/${{ env.WORK_DIR }}/screenshots/
-      #     if-no-files-found: ignore
-      #     retention-days: 7
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_number }}
+          # 👇 仅匹配该目录下的 png 文件
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: 🧽 清理进程和临时文件
         if: always()
