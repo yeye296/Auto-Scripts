@@ -27,6 +27,27 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 🛡️ 启动 Sing-Box 代理
+        working-directory: scripts/utils
+        env:
+          NODE_LINK: ${{ secrets.TEOHEBERG_PROXY }}
+        run: |
+          if [ -z "$NODE_LINK" ]; then exit 0; fi
+          bash setup_proxy.sh
+          
+          echo "[INFO] 测试代理连接..."
+          if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
+              echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+              IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
+              echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+              exit 0
+          else
+              echo "[ERROR] ❌ 代理连接失败"
+              echo "---- sing-box 日志 ----"
+              cat sing-box.log
+              exit 1
+          fi
+
       - name: 📦 安装 Python 依赖
         working-directory: scripts/${{ env.WORK_DIR }}
         run: |
@@ -47,37 +68,11 @@ jobs:
         working-directory: scripts/${{ env.WORK_DIR }}
         run: bash build.sh > /dev/null 2>&1
 
-      - name: 启用 WARP
-        uses: fscarmen/warp-on-actions@v1.3
-        with:
-          stack: dual
-          mode: client
-
-      - name: 配置 DNS 并验证 WARP
-        run: |
-          set -euo pipefail
-          sudo systemctl stop systemd-resolved 2>/dev/null || true
-          sudo rm -f /etc/resolv.conf
-          echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf
-          sudo chattr +i /etc/resolv.conf 2>/dev/null || true
-          sleep 3
-          for i in {1..30}; do
-            status=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -oP 'warp=\K\w+' || echo unknown)
-            [[ "$status" =~ ^(on|plus)$ ]] && echo "WARP 已连接" && break
-            echo "WARP 连接中... ($i/30)"
-            sleep 2
-          done
-          echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
-
       - name: 🎮 执行每日领取
         timeout-minutes: 15
         working-directory: scripts/${{ env.WORK_DIR }}
         env:
           PYTHONIOENCODING: utf-8
-          USERNAME: ${{ secrets.TEOHEBERG_MAIL }}
-          PASSWORD: ${{ secrets.TEOHEBERG_PASS }}
-          PANEL_URL: ${{ secrets.TEOHEBERG_PANEL_URL }}
-          CHROME_PROXY: "" 
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
 
