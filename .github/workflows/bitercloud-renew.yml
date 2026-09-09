@@ -1,0 +1,58 @@
+name: Bitercloud Auto Renew
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10 0 * * 0,3'
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: bitercloud
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: pip install "requests[socks]" -q
+
+      - name: 🎮 执行续期任务
+        timeout-minutes: 10
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONUNBUFFERED: "1"
+          PYTHONIOENCODING: utf-8
+        run: python app.py
+
+      - name: Commit and Push State Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          STATE_JSON="${WORK_DIR}/state.json"
+          if [[ -n $(git status -s "$STATE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $STATE_JSON 更新"
+            git add "$STATE_JSON"
+            echo "正在提交 State..."
+            git commit -m "Auto-update auth State in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "State 无变化，跳过提交。"
+          fi
