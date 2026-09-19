@@ -106,6 +106,7 @@ jobs:
 
       - name: Update Next Cronjob Run
         if: always() # 或者 success()，如果你希望仅在任务成功时才排期，失败不排期
+        working-directory: scripts/utils
         env:
           JOB_ID: ${{ secrets.TEOHEBERG_JOB_ID }}
           DELAY_MINS: 1445
