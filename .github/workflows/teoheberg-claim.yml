@@ -98,8 +98,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshots
+          name: screenshots-${{ github.run_number }}
           # 👇 使用变量拼接路径
           path: scripts/${{ env.WORK_DIR }}/screenshots/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Update Next Cronjob Run
+        if: always() # 或者 success()，如果你希望仅在任务成功时才排期，失败不排期
+        env:
+          JOB_ID: ${{ secrets.TEOHEBERG_JOB_ID }}
+          DELAY_MINS: 1445
+        run: python update_cron.py
