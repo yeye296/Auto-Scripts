@@ -3,7 +3,7 @@ name: TechnoHeberg 自动领取
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10 4 * * *'
+    - cron: '10 4 * * 3'
 
 jobs:
   claim:
