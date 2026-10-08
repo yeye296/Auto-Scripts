@@ -1,0 +1,105 @@
+name: NeoHeberg 自动续期
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 0 12,27 * *'
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: neoheberg
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # - name: 🛡️ 启动 Sing-Box 代理
+      #   working-directory: scripts/utils
+      #   env:
+      #     NODE_LINK: ${{ secrets.NEOHEBERG_PROXY }}
+      #   run: |
+      #     if [ -z "$NODE_LINK" ]; then exit 0; fi
+      #     bash setup_proxy.sh
+          
+      #     echo "[INFO] 测试代理连接..."
+      #     if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
+      #         echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+      #         IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
+      #         echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
+      #         exit 0
+      #     else
+      #         echo "[ERROR] ❌ 代理连接失败"
+      #         echo "---- sing-box 日志 ----"
+      #         cat sing-box.log
+      #         exit 1
+      #     fi
+
+      - name: 📦 安装 Python 依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: |
+          pip install -r requirements.txt -q
+
+      - name: 💾 获取 Playwright 版本
+        id: playwright-version
+        run: echo "version=$(playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: 📁 缓存 Playwright 浏览器
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: 🛠️ 安装系统依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      - name: 🎮 执行续期
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u app.py
+
+      - name: Commit and Push Cookie Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_number }}
+          # 👇 使用变量拼接路径
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
