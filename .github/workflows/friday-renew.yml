@@ -1,0 +1,93 @@
+name: Friday Auto Renew
+
+on:
+  schedule:
+    # 每天 UTC 时间 4:00 运行（北京时间 12:00）
+    - cron: '0 4 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: fridaydev
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: yeye296/Auto-Renew-Scripts
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: scripts
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🛠️ 安装依赖
+        working-directory: scripts/${{ env.WORK_DIR }}
+        run: bash build.sh > /dev/null 2>&1
+
+      - name: 启用 WARP
+        uses: fscarmen/warp-on-actions@v1.3
+        with:
+          stack: dual
+          mode: client
+
+      - name: 配置 DNS 并验证 WARP
+        run: |
+          set -euo pipefail
+          sudo systemctl stop systemd-resolved 2>/dev/null || true
+          sudo systemctl disable systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+          sudo chattr +i /etc/resolv.conf 2>/dev/null || true
+          sleep 3
+          for i in {1..30}; do
+            status=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -oP 'warp=\K\w+' || echo unknown)
+            [[ "$status" =~ ^(on|plus)$ ]] && echo "WARP 已连接" && break
+            echo "WARP 连接中... ($i/30)"
+            sleep 2
+          done
+          echo -n "出口 IP: " && curl -s https://api.ipify.org && echo
+
+      - name: Run renew script
+        timeout-minutes: 15
+        working-directory: scripts/${{ env.WORK_DIR }}
+        env:
+            PYTHONUNBUFFERED: "1"
+        run: |
+          stdbuf -oL xvfb-run -a python -u app.py 2>&1 && rc=0 || rc=$?
+          echo "脚本执行完毕，退出码: $rc"
+          exit $rc
+          
+      - name: Commit and Push Cookie Update
+        if: always()
+        # 保持在仓库根目录操作 git
+        working-directory: scripts
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          COOKIE_JSON="${WORK_DIR}/cookies.json"
+          if [[ -n $(git status -s "$COOKIE_JSON" 2>/dev/null) ]]; then
+            echo "检测到 $COOKIE_JSON 更新"
+            git add "$COOKIE_JSON"
+            echo "正在提交 Cookie..."
+            git commit -m "Auto-update auth cookie in ${WORK_DIR} [skip ci]"
+            git push
+          else
+            echo "Cookie 无变化，跳过提交。"
+          fi
+
+      - name: 上传截图产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_number }}
+          path: scripts/${{ env.WORK_DIR }}/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
