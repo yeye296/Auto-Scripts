@@ -1,4 +1,4 @@
-name: Nexio 自动续期
+name: Auto Renew Nexio
 
 on:
   workflow_dispatch:
