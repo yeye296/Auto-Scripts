@@ -1,4 +1,4 @@
-name: NeoHeberg 自动续期
+name: Auto Renew NeoHeberg
 
 on:
   workflow_dispatch:
@@ -27,42 +27,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      # - name: 🛡️ 启动 Sing-Box 代理
-      #   working-directory: scripts/utils
-      #   env:
-      #     NODE_LINK: ${{ secrets.NEOHEBERG_PROXY }}
-      #   run: |
-      #     if [ -z "$NODE_LINK" ]; then exit 0; fi
-      #     bash setup_proxy.sh
-          
-      #     echo "[INFO] 测试代理连接..."
-      #     if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
-      #         echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
-      #         IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
-      #         echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
-      #         exit 0
-      #     else
-      #         echo "[ERROR] ❌ 代理连接失败"
-      #         echo "---- sing-box 日志 ----"
-      #         cat sing-box.log
-      #         exit 1
-      #     fi
-
       - name: 📦 安装 Python 依赖
         working-directory: scripts/${{ env.WORK_DIR }}
         run: |
           pip install -r requirements.txt -q
-
-      - name: 💾 获取 Playwright 版本
-        id: playwright-version
-        run: echo "version=$(playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
-
-      - name: 📁 缓存 Playwright 浏览器
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: 🛠️ 安装系统依赖
         working-directory: scripts/${{ env.WORK_DIR }}
