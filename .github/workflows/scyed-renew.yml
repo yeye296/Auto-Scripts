@@ -1,4 +1,4 @@
-name: Scyed 自动续期
+name: Auto Renew Scyed
 
 on:
   schedule:
@@ -80,6 +80,7 @@ jobs:
           PYTHONIOENCODING: utf-8
           USERNAME: ${{ secrets.SCYED_USER }}
           PASSWORD: ${{ secrets.SCYED_PASS }}
+          SERVER_ID: ${{ secrets.SCYED_SERVER_ID }}
           # CHROME_PROXY: "socks5://127.0.0.1:40000"
         run: python app.py
 
