@@ -3,7 +3,7 @@ name: Auto Renew Nexio
 on:
   workflow_dispatch:
   schedule:
-    - cron: '15 6 * * 2'
+    - cron: '15 6 * * 1,2'
 
 jobs:
   renew:
