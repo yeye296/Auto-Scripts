@@ -26,40 +26,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: 🛡️ 启动 Gost 代理
-        env:
-            GOST_PROXY: ${{ secrets.DS_PROXY }}
-        run: |
-          if [ -z "$GOST_PROXY" ]; then exit 1; fi
-          VERSION=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors https://api.github.com/repos/ginuerzh/gost/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
-          VERSION=${VERSION:-2.12.0}
-          echo "📦 GOST 版本: $VERSION"
-          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
-          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
-          chmod +x gost
-          echo "启动 Gost 转发隧道..."
-          nohup ./gost -L http://:9090 -F="$GOST_PROXY" > gost.log 2>&1 &
-          echo "DS_PROXY=http://127.0.0.1:9090" >> $GITHUB_ENV
-          sleep 5
-          IP=$(curl -s --retry 5 --retry-delay 3 --retry-all-errors -x http://127.0.0.1:9090 https://api.ipify.org)
-          IP_MASKED=$(echo "$IP" | sed 's/\([0-9]*\.[0-9]*\.[0-9]*\.\)[0-9]*/\1xx/')
-          echo "✅ GOST 已启动，出口IP确认：$IP_MASKED"
 
-      - name: 🛠️ 安装依赖
-        working-directory: scripts/${{ env.WORK_DIR }}
-        run: bash build.sh > /dev/null 2>&1
-
-      - name: Run Python script
-        id: py_step
-        working-directory: scripts/discord
-        env:
-            PYTHONIOENCODING: utf-8
-            IS_LOGIN: true
-            DS_USERNAME: ${{ secrets.DS_USERNAME }}
-            DS_PASSWORD: ${{ secrets.DS_PASSWORD }}
+      - name: 🛠️ 安装系统依赖和 Python 依赖
         run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python app.py
+          sudo apt-get update
+          sudo apt-get install -y xvfb x11-utils xdotool scrot fonts-noto-cjk jq wget
+          pip install seleniumbase requests
+          seleniumbase install chromedriver
 
       - name: 启用 WARP
         uses: fscarmen/warp-on-actions@v1.3
@@ -91,16 +64,9 @@ jobs:
         timeout-minutes: 15
         working-directory: scripts/${{ env.WORK_DIR }}
         env:
-          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result || '{}').token }}
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           SESSION_TOKEN: ${{ secrets.NEW_BOT_SESSION_TOKEN }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          if [[ -z "$GH_TOKEN" ]]; then
-            echo "⚠️ 警告：检测到凭证缺失！"
-            exit 1
-          fi
           xvfb-run --auto-servernum python3 app.py
 
       - name: 上传截图产物
