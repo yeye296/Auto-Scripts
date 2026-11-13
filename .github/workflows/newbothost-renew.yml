@@ -26,26 +26,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      # - name: 🛡️ 启动 Sing-Box 代理
-      #   working-directory: scripts/utils
-      #   env:
-      #     NODE_LINK: ${{ secrets.NEW_BOT_HOST_PROXY }}
-      #   run: |
-      #     bash setup_proxy.sh
-          
-      #     echo "[INFO] 测试代理连接..."
-      #     if IP=$(curl -s --fail --max-time 15 -x socks5://127.0.0.1:1080 https://api.ipify.org) && [ -n "$IP" ]; then
-      #         echo "CHROME_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
-      #         IP_MASKED=$(echo "$IP" | sed 's/^[0-9]*\.[0-9]*\./xxx.xxx./')
-      #         echo "✅ Sing-Box 已启动，出口IP确认：$IP_MASKED"
-      #         exit 0
-      #     else
-      #         echo "[ERROR] ❌ 代理连接失败"
-      #         echo "---- sing-box 日志 ----"
-      #         cat sing-box.log
-      #         exit 1
-      #     fi
           
       - name: 🛡️ 启动 Gost 代理
         env:
@@ -75,6 +55,7 @@ jobs:
         working-directory: scripts/discord
         env:
             PYTHONIOENCODING: utf-8
+            IS_LOGIN: true
             DS_USERNAME: ${{ secrets.DS_USERNAME }}
             DS_PASSWORD: ${{ secrets.DS_PASSWORD }}
         run: |
@@ -110,13 +91,13 @@ jobs:
         timeout-minutes: 15
         working-directory: scripts/${{ env.WORK_DIR }}
         env:
-          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result).token }}
+          DISCORD_TOKEN: ${{ fromJSON(steps.py_step.outputs.result || '{}').token }}
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           SESSION_TOKEN: ${{ secrets.NEW_BOT_SESSION_TOKEN }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          if [[ -z "$DISCORD_TOKEN" || -z "$GH_TOKEN" ]]; then
+          if [[ -z "$GH_TOKEN" ]]; then
             echo "⚠️ 警告：检测到凭证缺失！"
             exit 1
           fi
