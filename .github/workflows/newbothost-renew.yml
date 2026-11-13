@@ -109,15 +109,11 @@ jobs:
         with:
           name: screenshots-${{ github.run_number }}
           # 👇 仅匹配该目录下的 png 文件
-          path: scripts/${{ env.WORK_DIR }}/*.png
+          path: |
+            scripts/${{ env.WORK_DIR }}/*.png
+            scripts/${{ env.WORK_DIR }}/screenshots/*.png
+            # 👇 使用 ** 递归匹配该目录及子目录（如 screenshots/）下的所有 png
+            # path: scripts/${{ env.WORK_DIR }}/**/*.png
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: 🧽 清理进程和临时文件
-        if: always()
-        run: |
-          pkill -f sing-box || true
-          pkill -f chromedriver || true
-          pkill -f chrome || true
-          pkill -f Xvfb || true
-          rm -f sing-box sing-box-config.json sing-box.log
